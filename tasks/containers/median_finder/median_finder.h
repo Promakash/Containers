@@ -2,10 +2,6 @@
 
 #include "set"
 
-//Считаю, что по ассимптотике все проходит - multiset построен на дереве, поэтому:
-//Insert - Log(n)
-//Remove - Log(n)
-//По поводу Find - O(1), т.к возвращает тупо итератор. Вычисляется в insert и remove. Т.к итератор set двунаправленный, операции -- и ++ происходят за константу
 class MedianFinder {
 private:
     std::multiset<int> ms;

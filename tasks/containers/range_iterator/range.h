@@ -3,15 +3,23 @@
 class RangeIt{
 private:
     int cur_index;
+    int end_of_iteration;
     int step_of_iteration;
 public:
-    RangeIt(const int index, const int step_){
+    RangeIt(const int index, const int step_, const int end_){
         cur_index = index;
         step_of_iteration = step_;
+        end_of_iteration = end_;
     }
 
     RangeIt& operator++(){
         cur_index += step_of_iteration;
+        if (cur_index - end_of_iteration > 0  && step_of_iteration > 0) {
+            cur_index = end_of_iteration;
+        }
+        if (cur_index - end_of_iteration < 0 && step_of_iteration < 0) {
+            cur_index = end_of_iteration;
+        }
         return *this;
     }
 
@@ -26,7 +34,6 @@ public:
 
 class Range {
 private:
-    friend class RangeIt;
     int start_;
     int end_;
     int step_;
@@ -37,29 +44,15 @@ public:
         step_ = step;
     }
 
-    Range(int start, int end){
-        start_ = start;
-        end_ = end;
-        step_ = 1;
-    }
+    Range(int start, int end) : Range(start, end, 1) {}
 
-    Range(int end){
-        start_ = 0;
-        end_ = end;
-        step_ = 1;
-    }
+    Range(int end) : Range(0, end, 1) {}
 
     RangeIt begin(){
-        return RangeIt(start_, step_);
+        return RangeIt(start_, step_, end_);
     }
 
-    //Я не понял как это сработало, но это сработало
-    //Есть какая то единая формула или элемент, на котором обрывается итерация вот так и высчитывается? не силен в математике(((
     RangeIt end(){
-        int last_num = end_ - ((end_-start_) % step_);
-        if ((end_-start_) % step_ == 0){
-            return RangeIt(last_num, step_);
-        }
-        return RangeIt(last_num+step_, step_);
+        return RangeIt(end_, step_, end_);
     }
 };

@@ -6,7 +6,6 @@
 #include "iterator"
 
 
-//Извини, что тут дико насрано - хотел почистить и довести до ума, но боюсь если чихну оно все сломается (
 template <typename Key, typename Value>
 class HashTable {
 public:
@@ -14,70 +13,76 @@ public:
         Key key;
         Value value;
     };
+
+    using Bucket = std::list<Entry>;
+    
 private:
-    std::vector<std::list<Entry>> storage;
+    std::vector<Bucket> storage;
     size_t size_of_storage;
     size_t cur_size;
 public:
     class Iterator {
-        //Почему требует компилятор требует typename итераторов?
-        //need 'typename' before 'std::__cxx11::list<HashTable<Key, Value>::Entry>::iterator' because 'std::__cxx11::list<HashTable<Key, Value>::Entry>' is a dependent scope
-        //Не понял о каком зависимом поле видимости идет речь из этой ошибки
-        typename std::vector<std::list<Entry>>::iterator storage_it;
-        typename std::list<Entry>::iterator dbl_list_it;
-        HashTable<Key, Value>& ht;
-    public:
-        Iterator(HashTable<Key, Value>& hashTable, typename std::vector<std::list<Entry>>::iterator it_stor)
-                : storage_it(it_stor),
-                  dbl_list_it(storage_it->begin()), ht(hashTable){
-            while (storage_it->begin() == storage_it->end() && storage_it != ht.storage.end()){
-                storage_it++;
+    private:
+        typename std::vector<Bucket>::iterator cur_entry;
+        typename Bucket::iterator cur_bucket;
+        typename std::vector<Bucket>::iterator end_of_storage;
+        void SkipEmptyFields(){
+            while (cur_entry->begin() == cur_entry->end() && cur_entry != end_of_storage){
+                cur_entry++;
             }
-            if (storage_it == ht.storage.end()){
+        }
+    public:
+        Iterator(typename std::vector<Bucket>::iterator it_of_storage, typename std::vector<Bucket>::iterator it_end_storage)
+                : cur_entry(it_of_storage),
+                  cur_bucket(cur_entry->begin()),
+                  end_of_storage(it_end_storage)
+        {
+            SkipEmptyFields();
+            if (cur_entry == end_of_storage){
                 return;
             }
-            dbl_list_it = storage_it->begin();
+            cur_bucket = cur_entry->begin();
         }
 
         Iterator& operator++(){
-            dbl_list_it++;
-            if (dbl_list_it == storage_it->end()){
-                storage_it++;
-                while (storage_it->begin() == storage_it->end() && storage_it != ht.storage.end()){
-                    storage_it++;
-                }
-                if (storage_it == ht.storage.end()){
+            cur_bucket++;
+            if (cur_bucket == cur_entry->end()){
+                cur_entry++;
+                SkipEmptyFields();
+                if (cur_entry == end_of_storage){
                     return *this;
                 }
-                dbl_list_it = storage_it->begin();
+                cur_bucket = cur_entry->begin();
             }
             return *this;
         }
 
         Entry& operator*(){
-            return *dbl_list_it;
+            return *cur_bucket;
         }
 
         bool operator!=(const Iterator& rhs){
-            return storage_it != rhs.storage_it;
+            return cur_entry != rhs.cur_entry;
         }
     };
 
 private:
     size_t hash_func(Key key_) const{
-        return (size_t)std::hash<Key>{}(key_);
+        return (size_t)std::hash<Key>{}(key_) % size_of_storage;
     }
+
     void resize(){
         size_of_storage *= 2;
-        std::vector<std::list<Entry>> rehashed_storage(size_of_storage);
+        std::vector<Bucket> rehashed_storage(size_of_storage);
         for (auto i: storage){
             for (auto j: i){
-                size_t hash_result = hash_func(j.key) % size_of_storage;
+                size_t hash_result = hash_func(j.key);
                 rehashed_storage[hash_result].push_back({j.key, j.value});
             }
         }
         std::swap(storage, rehashed_storage);
     }
+
 public:
     HashTable(){
         storage.resize(40);
@@ -85,7 +90,7 @@ public:
         cur_size = 0;
     }
     bool Insert(const Key& key, const Value& value){
-        size_t hash_result = hash_func(key) % size_of_storage;
+        size_t hash_result = hash_func(key);
         if (storage[hash_result].begin() != storage[hash_result].end()){
             for (auto it: storage[hash_result]){
                 if (it.key == key){
@@ -102,7 +107,7 @@ public:
     }
 
     std::pair<bool, Value> Find(const Key& key) const{
-        size_t hash_result = hash_func(key) % size_of_storage;
+        size_t hash_result = hash_func(key);
         for (auto it: storage[hash_result]){
             if (it.key == key){
                 return {true, it.value};
@@ -112,11 +117,11 @@ public:
     }
 
     bool Remove(const Key& key){
-        uint64_t hash_result = hash_func(key) % size_of_storage;
-        auto& dbl_list = storage[hash_result];
-        for (auto it = dbl_list.begin(); it != dbl_list.end(); ++it){
+        uint64_t hash_result = hash_func(key);
+        auto& Entries = storage[hash_result];
+        for (auto it = Entries.begin(); it != Entries.end(); ++it){
             if (it->key == key){
-                dbl_list.erase(it);
+                Entries.erase(it);
                 cur_size--;
                 return true;
             }
@@ -126,7 +131,7 @@ public:
 
 
     Value& operator[](const Key& key){
-        size_t hash_result = hash_func(key) % size_of_storage;
+        size_t hash_result = hash_func(key);
         for (auto& it: storage[hash_result]){
             if (it.key == key){
                 return it.value;
@@ -142,11 +147,11 @@ public:
     }
 
     auto begin(){
-        return Iterator(*this, storage.begin());
+        return Iterator(storage.begin(), storage.end());
     }
 
     auto end(){
-        return Iterator(*this, storage.end());
+        return Iterator(storage.end(), storage.end());
     }
 
 };
