@@ -15,7 +15,10 @@ public:
     };
 
     using Bucket = std::list<Entry>;
-    
+    using Entry_iterator = typename std::vector<Bucket>::iterator;
+    using Bucket_iterator = typename Bucket::iterator;
+    using Storage_iterator = typename std::vector<Bucket>::iterator;
+
 private:
     std::vector<Bucket> storage;
     size_t size_of_storage;
@@ -23,16 +26,19 @@ private:
 public:
     class Iterator {
     private:
-        typename std::vector<Bucket>::iterator cur_entry;
-        typename Bucket::iterator cur_bucket;
-        typename std::vector<Bucket>::iterator end_of_storage;
+
+        Entry_iterator cur_entry;
+        Bucket_iterator cur_bucket;
+        Storage_iterator end_of_storage;
+
         void SkipEmptyFields(){
             while (cur_entry->begin() == cur_entry->end() && cur_entry != end_of_storage){
                 cur_entry++;
             }
         }
+
     public:
-        Iterator(typename std::vector<Bucket>::iterator it_of_storage, typename std::vector<Bucket>::iterator it_end_storage)
+        Iterator(Storage_iterator it_of_storage, Entry_iterator it_end_storage)
                 : cur_entry(it_of_storage),
                   cur_bucket(cur_entry->begin()),
                   end_of_storage(it_end_storage)
@@ -49,11 +55,14 @@ public:
             if (cur_bucket == cur_entry->end()){
                 cur_entry++;
                 SkipEmptyFields();
+
                 if (cur_entry == end_of_storage){
                     return *this;
                 }
+
                 cur_bucket = cur_entry->begin();
             }
+
             return *this;
         }
 
@@ -67,79 +76,89 @@ public:
     };
 
 private:
-    size_t hash_func(Key key_) const{
+
+    size_t getBucketIndex(Key key_) const{
         return (size_t)std::hash<Key>{}(key_) % size_of_storage;
     }
 
     void resize(){
         size_of_storage *= 2;
         std::vector<Bucket> rehashed_storage(size_of_storage);
+
         for (auto i: storage){
             for (auto j: i){
-                size_t hash_result = hash_func(j.key);
+                size_t hash_result = getBucketIndex(j.key);
                 rehashed_storage[hash_result].push_back({j.key, j.value});
             }
         }
+
         std::swap(storage, rehashed_storage);
     }
 
 public:
     HashTable(){
-        storage.resize(40);
-        size_of_storage = 40;
+        size_of_storage = 20;
+        storage.resize(size_of_storage);
         cur_size = 0;
     }
+
     bool Insert(const Key& key, const Value& value){
-        size_t hash_result = hash_func(key);
-        if (storage[hash_result].begin() != storage[hash_result].end()){
-            for (auto it: storage[hash_result]){
-                if (it.key == key){
-                    return false;
-                }
-            }
+        auto& bucket = storage[getBucketIndex(key)];
+        auto it = std::find_if(bucket.begin(), bucket.end(), [&](const Entry& entry){ return entry.key == key; });
+
+        if (it != bucket.end()){
+            return false;
         }
-        storage[hash_result].push_back({key,value});
+
+        bucket.push_back({key,value});
         cur_size++;
         if (cur_size >= size_of_storage){
             resize();
         }
+
         return true;
     }
 
     std::pair<bool, Value> Find(const Key& key) const{
-        size_t hash_result = hash_func(key);
-        for (auto it: storage[hash_result]){
-            if (it.key == key){
-                return {true, it.value};
-            }
+        auto& bucket = storage[getBucketIndex(key)];
+        auto it = std::find_if(bucket.begin(), bucket.end(), [&](const Entry& entry){ return entry.key == key; });
+
+        std::pair<bool, Value> find_value;
+
+        find_value.first = (it != bucket.end());
+
+        if (find_value.first){
+            find_value.second = it->value;
         }
-        return {false, Value()};
+
+        return find_value;
     }
 
     bool Remove(const Key& key){
-        uint64_t hash_result = hash_func(key);
-        auto& Entries = storage[hash_result];
-        for (auto it = Entries.begin(); it != Entries.end(); ++it){
-            if (it->key == key){
-                Entries.erase(it);
-                cur_size--;
-                return true;
-            }
+        auto& bucket = storage[getBucketIndex(key)];
+        auto it = std::find_if(bucket.begin(), bucket.end(), [&](const Entry& entry){ return entry.key == key; });
+
+        if (it != bucket.end()){
+            bucket.erase(it);
+            cur_size--;
+            return true;
         }
+
         return false;
     }
 
 
     Value& operator[](const Key& key){
-        size_t hash_result = hash_func(key);
-        for (auto& it: storage[hash_result]){
-            if (it.key == key){
-                return it.value;
-            }
+        auto& bucket = storage[getBucketIndex(key)];
+        auto it = std::find_if(bucket.begin(), bucket.end(), [&](const Entry& entry){ return entry.key == key; });
+
+        if (it == bucket.end()){
+            bucket.push_back({key, Value()});
+            cur_size++;
+            return bucket.back().value;
         }
-        storage[hash_result].push_back({key, Value()});
-        cur_size++;
-        return storage[hash_result].back().value;
+
+        return it->value;
     }
 
     size_t Size() const{
