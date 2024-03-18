@@ -17,7 +17,7 @@ std::vector<int> GenerateVector(size_t n, size_t restrict = 1'000'000) {
 
         return std::vector<int>{s.begin(), s.end()};
     }
-    
+
     std::vector<int> v;
     v.reserve(n);
 
