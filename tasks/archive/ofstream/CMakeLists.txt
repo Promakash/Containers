@@ -1,1 +1,0 @@
-add_executable_test(test_ofstream test.cpp ofstream.h)
