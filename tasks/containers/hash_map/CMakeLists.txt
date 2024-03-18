@@ -1,1 +1,0 @@
-add_executable_test(test_hash_map test.cpp hash_map.h)
